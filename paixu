@@ -1,0 +1,87 @@
+#include <stdio.h>
+
+void insert_sort(int a[], int n)//插入排序
+{
+    int i, j, k;
+
+    for (i = 1; i < n; i++)
+    {
+        //为a[i]在前面的a[0...i-1]有序区间中找一个合适的位置
+        for (j = i - 1; j >= 0; j--)
+            if (a[j] < a[i])
+                break;
+
+        //如找到了一个合适的位置
+        if (j != i - 1)
+        {
+            //将比a[i]大的数据向后移
+            int temp = a[i];
+            for (k = i - 1; k > j; k--)
+                a[k + 1] = a[k];
+            a[k + 1] = temp;//将a[i]放到正确位置上
+        }
+    }
+}
+
+void binaryInsertSort(int data[] ,int n)//折半
+{
+    for(int i=1; i<n; i++){
+        int tmp = data[i];
+        int low = 0;
+        int high = i-1;
+
+        // 不断折半，寻找合适的插入位置
+        while(low <= high){
+            int mid = (low + high) / 2;
+            if(tmp>data[mid]){
+                low = mid + 1;
+            }else{
+                high = mid - 1;
+            }
+        }
+
+            // 依次将元素后移
+        for(int j=i; j>low ; j--){
+            data[j] = data[j-1];
+        }
+        data[low] = tmp;
+    }
+}
+
+void Shellsort1(int arr[],int length){ //希尔排序
+         //增量gap，并逐步缩小增量
+    for(int gap=length/2;gap>0;gap/=2){
+        //从第gap个元素，逐个对其所在组进行直接插入排序操作
+        for(int i=gap;i<length;i++){
+            int temp = arr[i];
+            if(arr[i]<arr[i-gap]){
+                //移动法
+                arr[i] = arr[i-gap];
+                arr[i-gap] = temp;
+            }
+        }
+    }
+}
+
+void show(int a[],int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        printf("%d   ",a[i]);
+        //printf(a);
+    }
+}
+
+
+int main()
+{
+    int array[] = {1,5,2,3,6,4,8,9,7,6,10,12,250,400,15,19};
+    int ArrLength;
+    ArrLength = sizeof(array) / sizeof(int);
+    Shellsort1(array,ArrLength);
+
+    show(array,ArrLength);
+
+    printf("Hello world!\n");
+    return 0;
+}
