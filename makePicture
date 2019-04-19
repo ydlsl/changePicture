@@ -1,0 +1,978 @@
+#include<bits/stdc++.h>
+#include<stdio.h>
+#include<malloc.h>
+#include<stdlib.h>
+
+using namespace std;
+//#pragma warning(disable:4996)
+/*
+位图头结构
+*/
+#pragma pack(1)
+typedef struct tagBITMAPFILEHEADER
+{
+	unsigned char bfType[2];//文件格式
+	unsigned long bfSize;//文件大小
+	unsigned short bfReserved1;//保留
+	unsigned short bfReserved2;
+	unsigned long bfOffBits; //DIB数据在文件中的偏移量
+}fileHeader;
+#pragma pack()
+
+/*
+位图数据信息结构
+*/
+#pragma pack(1)
+typedef struct tagBITMAPINFOHEADER
+{
+	unsigned long biSize;//该结构的大小
+	long biWidth;//文件宽度
+	long biHeight;//文件高度
+	unsigned short biPlanes;//平面数
+	unsigned short biBitCount;//颜色位数
+	unsigned long biCompression;//压缩类型
+	unsigned long biSizeImage;//DIB数据区大小
+	long biXPixPerMeter;
+	long biYPixPerMeter;
+	unsigned long biClrUsed;//多少颜色索引表
+	unsigned long biClrImporant;//多少重要颜色
+}fileInfo;
+#pragma pack()
+
+/*
+调色板结构
+*/
+#pragma pack(1)
+typedef struct tagRGBQUAD
+{
+	unsigned char rgbBlue; //蓝色分量亮度
+	unsigned char rgbGreen;//绿色分量亮度
+	unsigned char rgbRed;//红色分量亮度
+	unsigned char rgbReserved;
+}rgbq;
+#pragma pack(0)
+
+
+/*存储RGB图像的一行像素点*/
+	unsigned char ImgData[3000][3];
+	/*将灰度图的像素存到一个一维数组中*/
+	unsigned char ImgData2[3000];
+	//灰度值统计
+	int ImgCount[256]={0};
+	int ImgCount2[256]={0};
+	double ImgCountGL[256]={0};
+	//灰度统计
+	double ImgGL[256]={0};
+	//均衡后的值
+
+	FILE * fpBMP, *fpGray, *fpZFT;
+	fileHeader * fh;
+	fileInfo * fi;
+	rgbq * fq,* fqq;
+	int i, j, k;
+	long fWith;
+
+void openFile(){
+    if ((fpBMP = fopen("111.bmp", "rb")) == NULL)
+	{
+		printf("打开文件失败");
+		exit(0);
+	}
+
+	if ((fpGray = fopen("asd20.bmp", "wb")) == NULL)
+	{
+		printf("创建文件失败");
+		exit(0);
+	}
+
+	fh = (fileHeader *)malloc(sizeof(fileHeader));
+	fi = (fileInfo *)malloc(sizeof(fileInfo));
+	//读取位图头结构和信息头
+	fread(fh, sizeof(fileHeader), 1, fpBMP);
+	fread(fi, sizeof(fileInfo), 1, fpBMP);
+
+	if(fi->biBitCount==8)//为什么在使用这个后，vector就不能使用了？？？
+    {
+        fq = (rgbq *)malloc(sizeof(rgbq));//无法释放
+        fread(fq, sizeof(rgbq), 256, fpBMP);
+        printf("1234\n");
+    }
+
+	fWith = (fi->biWidth + 3) / 4 * 4;
+}
+
+void changeRGB(){
+
+    //头文件写入
+    fwrite(fh, sizeof(fileHeader), 1, fpGray);
+	fwrite(fi, sizeof(fileInfo), 1, fpGray);
+
+    for (i = 0; i < fi->biHeight; i++)
+	{
+		for (j = 0; j < fWith; j++)
+		{
+			for (k = 0; k < 3; k++)
+				fread(&ImgData[j][k], 1, 1, fpBMP);
+		}
+		for (j = 0; j < fWith; j++)
+		{
+			for (k = 0; k < 3; k++)
+			{
+				if (k == 1)
+					ImgData[j][k] = 0;
+				if (k == 3)
+					ImgData[j][k] = 0;
+
+                //ImgData[j][k] = 255 - ImgData[j][k];
+				fwrite(&ImgData[j][k], 1, 1, fpGray);
+			}
+
+		}
+	}
+}
+
+void changeGray()
+{
+    //修改头信息
+	fi->biBitCount = 8;
+	fi->biSizeImage = fWith* fi->biHeight;
+	//fi->biClrUsed=256;
+
+	fh->bfOffBits = sizeof(fileHeader) + sizeof(fileInfo) + 256 * sizeof(rgbq);
+	fh->bfSize = fh->bfOffBits + fi->biSizeImage;
+
+	//创建调色版
+	fq = (rgbq *)malloc(256 * sizeof(rgbq));
+	for (i = 0; i < 256; i++)
+	{
+		fq[i].rgbBlue = fq[i].rgbGreen = fq[i].rgbRed = i;
+		fq[i].rgbReserved=0;
+	}
+	//将头信息写入
+	fwrite(fh, sizeof(fileHeader), 1, fpGray);
+	fwrite(fi, sizeof(fileInfo), 1, fpGray);
+	fwrite(fq, sizeof(rgbq), 256, fpGray);
+	//读取RGB图像素并转换为灰度值
+	for (i = 0; i < fi->biHeight; i++)
+	{
+		for (j = 0; j < fWith; j++)
+		{
+			for (k = 0; k < 3; k++)
+				fread(&ImgData[j][k], 1, 1, fpBMP);
+		}
+		for (j = 0; j < fWith; j++)
+		{
+			ImgData2[j] = int((float)ImgData[j][0] * 0.114 +
+				(float)ImgData[j][1] * 0.587 +
+				(float)ImgData[j][2] * 0.299);
+		}
+		//将灰度图信息写入
+		fwrite(ImgData2, 1, j, fpGray);
+	}
+}
+
+void changeZHZF()
+{
+    //修改头信息
+	fi->biBitCount = 8;
+	fi->biSizeImage = fWith * fi->biHeight;
+	//fi->biClrUsed=256;
+
+	fh->bfOffBits = sizeof(fileHeader) + sizeof(fileInfo) + 256 * sizeof(rgbq);
+	fh->bfSize = fh->bfOffBits + fi->biSizeImage;
+
+	//创建调色版
+	fq = (rgbq *)malloc(256 * sizeof(rgbq));
+	for (i = 0; i < 256; i++)
+	{
+		fq[i].rgbBlue = fq[i].rgbGreen = fq[i].rgbRed = i;
+		fq[i].rgbReserved=0;
+	}
+	//将头信息写入
+	fwrite(fh, sizeof(fileHeader), 1, fpGray);
+	fwrite(fi, sizeof(fileInfo), 1, fpGray);
+	fwrite(fq, sizeof(rgbq), 256, fpGray);
+
+	//读取灰度图像素并转换为均衡灰度值
+
+    unsigned char ImgData4[fi->biSizeImage][3];
+
+	for (i = 0; i < fi->biHeight; i++)
+	{
+	    int number = i*fWith;
+		for (j = 0; j < fWith; j++)
+		{
+			for (k = 0; k < 3; k++)
+				fread(&ImgData4[number+j][k], 1, 1, fpBMP);
+		}
+		for (j = 0; j < fWith; j++)
+		{
+			ImgData2[j] = int((float)ImgData4[number+j][0] * 0.114 +
+				(float)ImgData4[number+j][1] * 0.587 +
+				(float)ImgData4[number+j][2] * 0.299);
+            ImgCount[ImgData2[j]]++;
+		}
+	}
+
+	for(i=0;i<256;i++){
+        ImgCountGL[i] = (double)ImgCount[i]/fi->biSizeImage;
+	}
+
+	ImgGL[0] = (int)(ImgCountGL[0]*255 + 0.5);
+
+	for(i=1;i<256;i++){
+        ImgCountGL[i] += ImgCountGL[i-1];
+        ImgGL[i] = (int)(ImgCountGL[i]*255 + 0.5);
+	}
+
+	for (i = 0; i < fi->biHeight; i++)
+	{
+		/*for (j = 0; j < fWith; j++)
+		{
+			for (k = 0; k < 3; k++)
+				fread(&ImgData4[j][k], 1, 1, fpBMP);
+		}*/
+		int number = i*fWith;
+		for (j = 0; j < fWith; j++)
+		{
+			ImgData2[j] = int((float)ImgData4[number+j][0] * 0.114 +
+				(float)ImgData4[number+j][1] * 0.587 +
+				(float)ImgData4[number+j][2] * 0.299);
+            ImgData2[j] = (unsigned char)ImgGL[ImgData2[j]];
+            ImgCount2[ImgData2[j]]++;
+		}
+		//将灰度图信息写入
+        fwrite(ImgData2, 1, j, fpGray);
+	}
+	//fclose(fpGray);
+
+
+	if ((fpZFT = fopen("asd8.bmp", "wb")) == NULL)
+	{
+		printf("创建文件失败");
+		exit(0);
+	}
+
+	fi->biBitCount = 8;
+	fi->biWidth = 1000;
+	fi->biHeight = 256;
+	fi->biSizeImage = 256*1000;
+	fh->bfSize = fh->bfOffBits + fi->biSizeImage;
+
+	fwrite(fh, sizeof(fileHeader), 1, fpZFT);
+	fwrite(fi, sizeof(fileInfo), 1, fpZFT);
+	fwrite(fq, sizeof(rgbq), 256, fpZFT);
+
+	for(i=0;i<256;i++)
+    {
+        printf("%d  ",ImgCount[i]);
+        ImgCount[i] /=10;
+        for (j = 0; j < 1000; j++)
+        {
+            if(j<= ImgCount[i])
+                ImgData2[j] = (unsigned char)0;
+            else
+                ImgData2[j] = (unsigned char)255;
+        }
+        fwrite(ImgData2, 1, j, fpZFT);
+    }
+    fclose(fpZFT);
+}
+
+void changeMove(long x, long y){
+
+    if(abs(x)>=fWith||abs(y)>=fi->biHeight)
+        return;
+    //头文件写入
+    bool once = true;
+    bool read = true;
+    unsigned char ImgDataLS[3000][3];
+    fwrite(fh, sizeof(fileHeader), 1, fpGray);
+	fwrite(fi, sizeof(fileInfo), 1, fpGray);
+
+    for (i = 0; i < fi->biHeight; i++)
+	{
+	    if(!read)
+            break;
+		for (j = 0; j < fWith; j++)
+			for (k = 0; k < 3; k++)
+                fread(&ImgData[j][k], 1, 1, fpBMP);//读出一行
+
+        for (j = 0; j < fWith; j++)//写入一行
+        {
+            if(y<0)//下移处理
+            {
+                if(once)//先把空白写上
+                {
+                    for(int a=0;a<abs(y);a++)//y行空白
+                        for(int n=0;n<fWith;n++)
+                            for (k = 0; k < 3; k++)
+                            {
+                                ImgDataLS[n][k] =(unsigned char)255;
+                                fwrite(&ImgDataLS[n][k], 1, 1, fpGray);
+                            }
+                    once = false;
+                }
+                if(i>=fi->biHeight+y)//写完平移图
+                {
+                    read=false;
+                    break;
+                }
+
+                //x
+                if(x>=0)//右移
+                    {
+                        //右移x位
+                        if(x==0)
+                            ;
+                        else if(j>=x)
+                            for (k = 0; k < 3; k++)
+                                fwrite(&ImgData[j-x][k], 1, 1, fpGray);//写入一个点
+                        else
+                            for (k = 0; k < 3; k++)
+                            {
+                                ImgData[j][k] =(unsigned char)255;
+                                fwrite(&ImgData[j][k], 1, 1, fpGray);//写入一个点
+                            }
+                    }
+                else //左移
+                {
+                    //右移x位
+                            if(j>= fWith + x)
+                                for (k = 0; k < 3; k++)
+                                {
+                                    ImgData[j][k] =(unsigned char)255;
+                                    fwrite(&ImgData[j][k], 1, 1, fpGray);
+                                }
+
+                            else
+                                for (k = 0; k < 3; k++)
+                                    fwrite(&ImgData[j-x][k], 1, 1, fpGray);
+                }
+
+            }
+
+            else //上移处理
+            {
+                if(i<y)
+                    break;
+                if(x>=0)//右移
+                    {
+                        if(x==0)
+                            ;
+                        else if(j>=x)
+                            for (k = 0; k < 3; k++)
+                                fwrite(&ImgData[j-x][k], 1, 1, fpGray);//写入一个点
+                        else
+                            for (k = 0; k < 3; k++)
+                            {
+                                ImgData[j][k] =(unsigned char)255;
+                                fwrite(&ImgData[j][k], 1, 1, fpGray);//写入一个点
+                            }
+                    }
+                else //左移
+                {
+                     if(j>= fWith + x)
+                                for (k = 0; k < 3; k++)
+                                {
+                                    ImgData[j][k] =(unsigned char)255;
+                                    fwrite(&ImgData[j][k], 1, 1, fpGray);
+                                }
+
+                            else
+                                for (k = 0; k < 3; k++)
+                                    fwrite(&ImgData[j-x][k], 1, 1, fpGray);
+                }
+            }
+
+        }
+    }
+
+}
+
+void changeSpin(int oldX, int newX){ //尽量连号 4/5
+
+    if(oldX == newX)
+        return;
+    int isBig = newX-oldX;
+    //头文件写入
+    //long biWidth = fi->biWidth;
+    long biHeight = fi->biHeight;
+    fi->biWidth = (long)((float(newX)/oldX *fWith));
+	fi->biHeight = (long)((float(newX)/oldX *fi->biHeight));
+
+	//fi->biHeight *=2 ;
+	//fi->biWidth *=2 ;
+	fi->biSizeImage = fi->biHeight*fi->biWidth;
+	fh->bfSize = fh->bfOffBits + fi->biSizeImage;
+    //unsigned char ImgDataLS[3000][3];//平均值处理
+    fwrite(fh, sizeof(fileHeader), 1, fpGray);
+	fwrite(fi, sizeof(fileInfo), 1, fpGray);
+
+    for (i = 0; i < biHeight; i++)
+	{
+	    for (j = 0; j < fWith; j++)
+			for (k = 0; k < 3; k++)
+                fread(&ImgData[j][k], 1, 1, fpBMP);//读出一行
+
+        /*for (j = 0; j < fWith; j++)
+        {
+            for (k = 0; k < 3; k++)
+                fwrite(&ImgData[j][k], 1, 1, fpGray);
+            for (k = 0; k < 3; k++)
+                fwrite(&ImgData[j][k], 1, 1, fpGray);
+        }
+
+
+        for (j = 0; j < fWith; j++)
+        {
+            for (k = 0; k < 3; k++)
+                fwrite(&ImgData[j][k], 1, 1, fpGray);
+            for (k = 0; k < 3; k++)
+                fwrite(&ImgData[j][k], 1, 1, fpGray);
+        }*/
+
+        if(i%oldX==0)
+            if(isBig>0)//放大
+                for (j = 0; j < fWith; j++)//写入一行
+                {
+
+                        //航处理
+                    if(j%oldX==0)
+                        if(isBig>0)//放大
+                            for (k = 0; k < 3; k++)
+                                fwrite(&ImgData[j][k], 1, 1, fpGray);
+                        else
+                            continue;
+                    else ;
+                    for (k = 0; k < 3; k++)
+                        fwrite(&ImgData[j][k], 1, 1, fpGray);
+
+                }
+            else
+                continue;
+        else ;
+        for (j = 0; j < fWith; j++)//写入一行
+        {
+                //航处理
+            if(j%oldX==0)
+                if(isBig>0)//放大
+                    for (k = 0; k < 3; k++)
+                        fwrite(&ImgData[j][k], 1, 1, fpGray);
+                else
+                    continue;
+            else ;
+            for (k = 0; k < 3; k++)
+                fwrite(&ImgData[j][k], 1, 1, fpGray);
+
+        }
+	}
+}
+
+void changeOrder(){
+
+    unsigned char ImgDataLS[1000][700];//平均值处理
+    unsigned char ImgDataLS2[1000][700];
+    int a,b,c,d,e,f,g,h,m;
+    int asdd[9];
+
+    //头文件写入
+	fi->biBitCount = 8;
+	fi->biSizeImage = fWith * fi->biHeight;
+	//asdd.push_back(123);
+	fh->bfOffBits = sizeof(fileHeader) + sizeof(fileInfo) + 256 * sizeof(rgbq);
+	fh->bfSize = fh->bfOffBits + fi->biSizeImage;
+
+	//创建调色版
+
+	fqq = (rgbq *)malloc(256 * sizeof(rgbq));
+	for (i = 0; i < 256; i++)
+	{
+		fqq[i].rgbBlue = fqq[i].rgbGreen = fqq[i].rgbRed = i;
+		fqq[i].rgbReserved=0;
+	}
+	//将头信息写入
+	fwrite(fh, sizeof(fileHeader), 1, fpGray);
+	fwrite(fi, sizeof(fileInfo), 1, fpGray);
+	fwrite(fqq, sizeof(rgbq), 256, fpGray);
+
+    for (i = 0; i < fi->biHeight; i++)
+		for (j = 0; j < fWith; j++)
+            fread(&ImgDataLS[i][j], 1, 1, fpBMP);
+
+    for (i = 0; i < fi->biHeight; i++)
+		for (j = 0; j < fWith; j++)
+		    if(i==0||j==0||i==fWith||j==fi->biHeight)
+                ImgDataLS2[i][j] = ImgDataLS[i][j];
+            else
+            {
+                a = ImgDataLS[i-1][j];
+                b = ImgDataLS[i-1][j-1];
+                c = ImgDataLS[i-1][j+1];
+                d = ImgDataLS[i][j];
+                e = ImgDataLS[i][j-1];
+                f = ImgDataLS[i][j+1];
+                g = ImgDataLS[i+1][j];
+                h = ImgDataLS[i+1][j-1];
+                m = ImgDataLS[i+1][j+1];
+                //ImgDataLS2[i][j] = (unsigned char)((a+b+c+d+e+f+g+h+m)/9);//均值滤波
+
+                /*asdd.clear();
+                asdd.push_back(a);asdd.push_back(b);asdd.push_back(c);
+                asdd.push_back(d);asdd.push_back(e);asdd.push_back(f);
+                asdd.push_back(g);asdd.push_back(h);asdd.push_back(m);
+                sort(asdd.begin(),asdd.end());*/
+
+                asdd[0] = a;asdd[1] = b;asdd[2] = c;
+                asdd[3] = d;asdd[4] = e;asdd[5] = f;
+                asdd[6] = g;asdd[7] = h;asdd[8] = m;
+                sort(asdd,asdd+9);
+                ImgDataLS2[i][j] = (unsigned char)(asdd[4]);//中值滤波
+
+                /*if(i==200&&j==200)
+                {
+                    cout<<a<<" " <<c <<" "<< d <<" " <<e <<" " <<f <<" "<< g <<" " <<h <<" " <<m<<endl;
+                    for(int a = 0;a<asdd.size();a++)
+                        cout<<asdd[a]<<endl;
+                    cout<<asdd.at(asdd.size()/2)<<endl;
+                }
+                asdd.clear();*/
+            }
+
+    for (i = 0; i < fi->biHeight; i++)
+    {
+        for (j = 0; j < fWith; j++)
+        {
+            fwrite(&ImgDataLS2[i][j], 1, 1, fpGray);
+            //cout<<(int)ImgDataLS[i][j]/100;
+        }
+
+    }
+    if(fqq);
+        free(fqq);
+
+}
+
+void changFan(){
+
+    unsigned char ImgDataLS[1000][700];//镜像处理
+    //头文件写入
+    long fHeight = fi->biHeight;
+    fi->biHeight *=2;
+    //fi->biWidth *= 2;
+	fi->biBitCount = 8;
+	fi->biSizeImage = fWith * fi->biHeight ;
+	fh->bfOffBits = sizeof(fileHeader) + sizeof(fileInfo) + 256 * sizeof(rgbq);
+	fh->bfSize = fh->bfOffBits + fi->biSizeImage;
+
+	//创建调色版
+	fqq = (rgbq *)malloc(256 * sizeof(rgbq));
+	for (i = 0; i < 256; i++)
+	{
+		fqq[i].rgbBlue = fqq[i].rgbGreen = fqq[i].rgbRed = i;
+		fqq[i].rgbReserved=0;
+	}
+	//将头信息写入
+	fwrite(fh, sizeof(fileHeader), 1, fpGray);
+	fwrite(fi, sizeof(fileInfo), 1, fpGray);
+	fwrite(fqq, sizeof(rgbq), 256, fpGray);
+
+    for (i = 0; i < fHeight; i++)
+    {
+        for (j = 0; j < fWith; j++)
+        {
+            fread(&ImgDataLS[i][j], 1, 1, fpBMP);
+            fwrite(&ImgDataLS[i][j], 1, 1, fpGray);
+        }
+        /*for (j = fWith-1; j >=0 ; j--)//宽两倍
+        {
+            fwrite(&ImgDataLS[i][j], 1, 1, fpGray);
+        }*/
+    }
+
+    for (i = fHeight-1; i >=0 ; i--)//高；两倍
+    {
+        for (j = 0; j < fWith; j++)
+        {
+            fwrite(&ImgDataLS[i][j], 1, 1, fpGray);
+        }
+
+    }
+    if(fqq);
+        free(fqq);
+}
+
+
+void changRotation(int x,int y,int rotation)
+{
+    unsigned char ImgDataLS[1000][1000];//旋转处理
+    unsigned char ImgDataLS2[1000][1000];
+    int x1,y1,xx,yy;
+    //头文件写入
+    long fHeight = fi->biHeight;
+	fi->biBitCount = 8;
+	fi->biSizeImage = fWith * fi->biHeight;
+	fh->bfOffBits = sizeof(fileHeader) + sizeof(fileInfo) + 256 * sizeof(rgbq);
+	fh->bfSize = fh->bfOffBits + fi->biSizeImage;
+
+	//创建调色版
+	fqq = (rgbq *)malloc(256 * sizeof(rgbq));
+	for (i = 0; i < 256; i++)
+	{
+		fqq[i].rgbBlue = fqq[i].rgbGreen = fqq[i].rgbRed = i;
+		fqq[i].rgbReserved=0;
+	}
+	//将头信息写入
+	fwrite(fh, sizeof(fileHeader), 1, fpGray);
+	fwrite(fi, sizeof(fileInfo), 1, fpGray);
+	fwrite(fqq, sizeof(rgbq), 256, fpGray);
+
+    for (i = 0; i < fHeight; i++)
+        for (j = 0; j < fWith; j++)
+            fread(&ImgDataLS[i][j], 1, 1, fpBMP);
+
+    for (i = 0; i < fHeight; i++)
+    {
+        y1 = i - y;
+        for (j = 0; j < fWith; j++)
+        {
+            x1 = j - x;
+            xx = x1*cos(rotation) + y1 * sin(rotation) +x +0.5;
+            yy = -x1*sin(rotation) + y1 * cos(rotation) +y +0.5;
+            if(xx<1||yy<1||xx>1000||yy>1000)
+                continue;
+            else{
+                if(ImgDataLS2[yy][xx]==NULL)
+                    ImgDataLS2[yy][xx] = ImgDataLS[i][j];
+                else if(ImgDataLS2[yy+1][xx]==NULL)
+                    ImgDataLS2[yy+1][xx] = ImgDataLS[i][j];
+                else if(ImgDataLS2[yy-1][xx]==NULL)
+                    ImgDataLS2[yy-1][xx] = ImgDataLS[i][j];
+                else if(ImgDataLS2[yy][xx+1]==NULL)
+                    ImgDataLS2[yy][xx+1] = ImgDataLS[i][j];
+                else if(ImgDataLS2[yy][xx-1]==NULL)
+                    ImgDataLS2[yy][xx-1] = ImgDataLS[i][j];
+                else{
+                    xx++;yy++;
+                    if(ImgDataLS2[yy][xx]==NULL)
+                    ImgDataLS2[yy][xx] = ImgDataLS[i][j];
+                else if(ImgDataLS2[yy+1][xx]==NULL)
+                    ImgDataLS2[yy+1][xx] = ImgDataLS[i][j];
+                else if(ImgDataLS2[yy-1][xx]==NULL)
+                    ImgDataLS2[yy-1][xx] = ImgDataLS[i][j];
+                else if(ImgDataLS2[yy][xx+1]==NULL)
+                    ImgDataLS2[yy][xx+1] = ImgDataLS[i][j];
+                else if(ImgDataLS2[yy][xx-1]==NULL)
+                    ImgDataLS2[yy][xx-1] = ImgDataLS[i][j];
+                }
+
+            }
+        }
+
+    }
+
+    for (i = 0; i < fHeight; i++)
+        for (j = 0; j < fWith; j++){
+
+            if(ImgDataLS2[i][j]==NULL)
+            {
+                ImgDataLS2[i][j] = (unsigned char) 0;
+            }
+
+            fwrite(&ImgDataLS2[i][j], 1, 1, fpGray);
+        }
+
+    if(fqq);
+        free(fqq);
+
+}
+
+void  read()
+{
+    unsigned char ImgDataLS[1000][700];//像素处理
+
+    fi->biBitCount = 8;
+	fi->biSizeImage = fWith * fi->biHeight;
+	//asdd.push_back(123);
+	fh->bfOffBits = sizeof(fileHeader) + sizeof(fileInfo) + 256 * sizeof(rgbq);
+	fh->bfSize = fh->bfOffBits + fi->biSizeImage;
+
+	//创建调色版
+
+	fqq = (rgbq *)malloc(256 * sizeof(rgbq));
+	for (i = 0; i < 256; i++)
+	{
+		fqq[i].rgbBlue = fqq[i].rgbGreen = fqq[i].rgbRed = i;
+		fqq[i].rgbReserved=0;
+	}
+	//将头信息写入
+	fwrite(fh, sizeof(fileHeader), 1, fpGray);
+	fwrite(fi, sizeof(fileInfo), 1, fpGray);
+	fwrite(fqq, sizeof(rgbq), 256, fpGray);
+
+    for (i = 0; i < fi->biHeight; i++)
+		for (j = 0; j < fWith; j++)
+        {
+            fread(&ImgDataLS[i][j], 1, 1, fpBMP);
+            fwrite(&ImgDataLS[i][j], 1, 1, fpGray);
+        }
+    if(fqq)
+        free(fqq);
+}
+
+void changeYuZhi(int thing)
+{
+    unsigned char ImgDataLS[1000][700];//像素处理
+    fi->biBitCount = 8;
+	fi->biSizeImage = fWith * fi->biHeight;
+	//asdd.push_back(123);
+	fh->bfOffBits = sizeof(fileHeader) + sizeof(fileInfo) + 256 * sizeof(rgbq);
+	fh->bfSize = fh->bfOffBits + fi->biSizeImage;
+
+	//创建调色版
+
+	fqq = (rgbq *)malloc(256 * sizeof(rgbq));
+	for (i = 0; i < 256; i++)
+	{
+		fqq[i].rgbBlue = fqq[i].rgbGreen = fqq[i].rgbRed = i;
+		fqq[i].rgbReserved=0;
+	}
+	//将头信息写入
+	fwrite(fh, sizeof(fileHeader), 1, fpGray);
+	fwrite(fi, sizeof(fileInfo), 1, fpGray);
+	fwrite(fqq, sizeof(rgbq), 256, fpGray);
+
+    for (i = 0; i < fi->biHeight; i++)
+		for (j = 0; j < fWith; j++)
+        {
+            fread(&ImgDataLS[i][j], 1, 1, fpBMP);
+            if(ImgDataLS[i][j]>thing)
+                ImgDataLS[i][j]=(unsigned char)255;
+            else
+                ImgDataLS[i][j]=(unsigned char)0;
+            fwrite(&ImgDataLS[i][j] , 1, 1, fpGray);
+        }
+    if(fqq)
+        free(fqq);
+
+}
+
+
+double findZhong(double index,double ImgGL[])//迭代找合适的阈值
+{
+    double t1 = index;
+    double t2 = 0;
+
+    while(true){
+        double iinn1 = 0;
+        double iinn2 = 0;
+        double nn1 = 0;
+        double nn2 = 0;
+
+        for(int i=0;i<256;i++)
+            if(ImgGL[i]>=t1){
+                iinn2 += i*ImgGL[i];
+                nn2 += ImgGL[i];
+            }
+            else{
+                iinn1 += i*ImgGL[i];
+                nn1 += ImgGL[i];
+            }
+
+        t2 = (iinn1/nn1 + iinn2/nn2)/2;
+        //cout<<t2<<12<<endl;
+        if(abs(t2-t1)<5)//内定给定值==5；
+            return t2;
+        t1=t2;
+    }
+}
+
+void changeYuZhiDieDai()//迭代阈值
+{
+    unsigned char ImgDataLS[1000][800];//像素处理
+
+    fi->biBitCount = 8;
+	fi->biSizeImage = fWith * fi->biHeight;
+	//asdd.push_back(123);
+	fh->bfOffBits = sizeof(fileHeader) + sizeof(fileInfo) + 256 * sizeof(rgbq);
+	fh->bfSize = fh->bfOffBits + fi->biSizeImage;
+
+	//创建调色版
+
+	fqq = (rgbq *)malloc(256 * sizeof(rgbq));
+	for (i = 0; i < 256; i++)
+	{
+		fqq[i].rgbBlue = fqq[i].rgbGreen = fqq[i].rgbRed = i;
+		fqq[i].rgbReserved=0;
+	}
+	//将头信息写入
+	fwrite(fh, sizeof(fileHeader), 1, fpGray);
+	fwrite(fi, sizeof(fileInfo), 1, fpGray);
+	fwrite(fqq, sizeof(rgbq), 256, fpGray);
+
+    for (i = 0; i < fi->biHeight; i++)
+		for (j = 0; j < fWith; j++)
+        {
+            fread(&ImgData2[j], 1, 1, fpBMP);
+            ImgDataLS[i][j] = ImgData2[j];
+            ImgGL[ImgData2[j]]++;
+            ImgCount[ImgData2[j]]++;
+            //cout<<ImgData2[j];
+        }
+    sort(ImgCount,ImgCount+256);
+    /*for(int i=0;i<256;i++)
+        cout<<ImgCount[i]<<" ";*/
+    double index = ImgCount[128];
+    //cout<<index<<endl;
+
+    index = findZhong(index,ImgGL);
+
+
+    for (i = 0; i < fi->biHeight; i++)
+		for (j = 0; j < fWith; j++)
+        {
+            if(ImgDataLS[i][j]>index)
+                ImgDataLS[i][j]=(unsigned char)255;
+            else
+                ImgDataLS[i][j]=(unsigned char)0;
+            fwrite(&ImgDataLS[i][j] , 1, 1, fpGray);
+        }
+
+
+    if(fqq)
+        free(fqq);
+
+}
+
+
+
+void draw256()//画统计图
+{
+    if ((fpZFT = fopen("qwe1.bmp", "wb")) == NULL)
+	{
+		printf("创建文件失败");
+		exit(0);
+	}
+
+	fi->biBitCount = 8;
+	fi->biWidth = 1000;
+	fi->biHeight = 256;
+	fi->biSizeImage = 256*1000;
+	fh->bfSize = fh->bfOffBits + fi->biSizeImage;
+
+	fwrite(fh, sizeof(fileHeader), 1, fpZFT);
+	fwrite(fi, sizeof(fileInfo), 1, fpZFT);
+	fwrite(fq, sizeof(rgbq), 256, fpZFT);
+
+	for(i=0;i<256;i++)
+    {
+        //printf("%d  ",ImgCount[i]);
+        ImgCount[i] /=5;
+        for (j = 0; j < 1000; j++)
+        {
+            if(j<= ImgCount[i])
+                ImgData2[j] = (unsigned char)0;
+            else
+                ImgData2[j] = (unsigned char)255;
+        }
+        fwrite(ImgData2, 1, j, fpZFT);
+    }
+    fclose(fpZFT);
+    //cout<<sizeof(ImgCount)<<endl;
+
+}
+
+void changeOtsu()
+{
+    memset(ImgCount,0,256);//初始化
+
+    unsigned char ImgDataLS[1000][700];//像素处理
+    fi->biBitCount = 8;
+	fi->biSizeImage = fWith * fi->biHeight;
+	//asdd.push_back(123);
+	fh->bfOffBits = sizeof(fileHeader) + sizeof(fileInfo) + 256 * sizeof(rgbq);
+	fh->bfSize = fh->bfOffBits + fi->biSizeImage;
+
+	//创建调色版
+
+	fqq = (rgbq *)malloc(256 * sizeof(rgbq));
+	for (i = 0; i < 256; i++)
+	{
+		fqq[i].rgbBlue = fqq[i].rgbGreen = fqq[i].rgbRed = i;
+		fqq[i].rgbReserved=0;
+	}
+	//将头信息写入
+	fwrite(fh, sizeof(fileHeader), 1, fpGray);
+	fwrite(fi, sizeof(fileInfo), 1, fpGray);
+	fwrite(fqq, sizeof(rgbq), 256, fpGray);
+
+	if(fqq)
+        free(fqq);
+
+    for (i = 0; i < fi->biHeight; i++)
+		for (j = 0; j < fWith; j++)
+        {
+            fread(&ImgDataLS[i][j], 1, 1, fpBMP);
+            ImgCount[ImgDataLS[i][j]]++;
+        }   //fwrite(&ImgDataLS[i][j] , 1, 1, fpGray);
+
+
+    sort(ImgCount,ImgCount+256);
+
+    draw256();//画统计图
+
+
+}
+
+
+
+int main()
+{
+
+	openFile();
+
+	//RGB值调节
+    //changeRGB();//abs1234
+
+	//灰度值调节
+    //changeGray();//abs5
+
+    //灰度均衡调节
+    //changeZHZF();//abs678
+
+    //平移处理
+    //changeMove(-100,-10);//abs9
+
+    //缩放处理
+    //changeSpin(2,1);//abs10
+
+    //均值滤波
+    //changeOrder();//abs11.12
+
+    //镜像处理
+    //changFan();//asd13-14
+
+    //旋转处理
+    //changRotation(300,400,45);//asd15.16
+
+    //读取处理的灰度图
+    //read();//asd17
+
+    //阈值处理
+    //changeYuZhi(100);//asd18
+
+    //迭代处理
+    //changeYuZhiDieDai();//asd19
+
+    //OTSU处理
+    changeOtsu();//asd20
+
+
+	if(fh)free(fh);
+	if(fi)free(fi);
+
+	fclose(fpBMP);
+	fclose(fpGray);
+	printf("success\n");
+	return 0;
+}
