@@ -1,0 +1,141 @@
+#include<stdio.h>
+
+#define MAXSIZE 7
+#define true 1
+#define false 0
+
+typedef int bool;
+
+typedef struct
+{
+	int data;
+	int cur;
+}StaticLinkList[MAXSIZE];
+
+//初始化静态链表,0位置cur指向1位置，1位置cur指向2位置...MAXSIZE-1位置指向0位置
+void InitStaticLinkList(StaticLinkList L)//本来想用小写l的，但是小写l看起来太怪了
+{
+	for (int i = 0; i < MAXSIZE - 2; i++)
+	{
+		L[i].cur = i + 1;//最后一个元素指向的是尾节点
+	}
+	L[MAXSIZE - 2].cur = 0;//备用链表的最后一个空元素的cur指向0，这一行不能省。
+	L[MAXSIZE - 1].cur = 0;
+}
+
+
+//求静态链表中元素个数，不包括头尾节点
+int StaticLinkListLength(StaticLinkList L)
+{
+	int i = L[MAXSIZE - 1].cur;
+	int j = 0;
+	while (i)
+	{
+		j++;
+		i = L[i].cur;
+	}
+	return j;
+}
+
+//插入元素时，分配空间的下标
+int Malloc(StaticLinkList L)
+{
+	int i = L[0].cur;
+	if (i)
+		L[0].cur = L[i].cur;
+	return i;
+}
+
+
+//静态链表中i位置插入一个元素
+bool StaticLinkListInsert(StaticLinkList L, int i, int key)
+{
+	//判断插入点是否合理
+	if (i<1 || i>StaticLinkListLength(L)+1)
+	{
+		return false;
+	}
+	int j = Malloc(L);
+	int k = MAXSIZE - 1;
+	if (j)
+	{
+		for (int l = 1; l <= j - 1; l++)
+		{
+			k = L[k].cur;
+		}
+		L[j].data = key;
+		L[j].cur = L[k].cur;
+		L[k].cur = j;
+		//printf("%d \n", k);
+		//printf("%d \n", L[MAXSIZE - 1].cur);
+		return true;
+	}
+	return false;
+
+}
+
+
+void Free(StaticLinkList L, int k)
+{
+	L[k].cur = L[0].cur;
+	L[0].cur = k;
+}
+
+//删除第i个元素
+
+bool StaticLinkListDelete(StaticLinkList L,int i, int *key)
+{
+	if (i < 1 || i >= StaticLinkListLength(L))
+	{
+		return false;
+	}
+	int k = MAXSIZE - 1;
+	for (int l = 1; l <= i-1; l++)
+	{
+		k = L[k].cur;
+	}
+	int j = L[k].cur;
+	*key = L[j].data;
+	L[k].cur = L[j].cur;
+	Free(L, j);
+	return true;
+}
+
+//遍历
+void StaticLinkListTraverse(StaticLinkList L)
+{
+	int k = MAXSIZE - 1;
+	//printf("%d ", L[k].data);
+		//printf("%d \n", L[0].cur);
+	while (L[k].cur)
+	{
+		k = L[k].cur;
+		printf("%d ", L[k].data);
+		//printf("%d \n", L[k].cur);
+	}
+	printf("\n");
+}
+
+int main(void)
+{
+	StaticLinkList L;
+	printf("初始化链表:\n");
+	InitStaticLinkList(L);
+	printf("初始化链表之后，链表的长度为:%d\n", StaticLinkListLength(L));
+	printf("插入1,2,3,4,5\n");
+	StaticLinkListInsert(L, 1, 1);StaticLinkListTraverse(L);
+	StaticLinkListInsert(L, 1, 2);StaticLinkListTraverse(L);
+	StaticLinkListInsert(L, 1, 3);StaticLinkListTraverse(L);
+	StaticLinkListInsert(L, 2, 4);StaticLinkListTraverse(L);
+	StaticLinkListInsert(L, 3, 5);StaticLinkListTraverse(L);
+	printf("遍历链表:\n");
+	StaticLinkListTraverse(L);
+	printf("链表长度为:%d\n", StaticLinkListLength(L));
+	printf("删除第二个元素:\n");
+	int key;
+	StaticLinkListDelete(L, 2, &key);
+	printf("删除的元素值为:%d\n", key);
+	printf("遍历链表:\n");
+	StaticLinkListTraverse(L);
+
+}
